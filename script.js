@@ -1,10 +1,10 @@
-const customerNameInput = document.getElementById("customerName");
-const productCountInput = document.getElementById("productCount");
-const productsContainer = document.getElementById("productsContainer");
-const deliveryOptionSelect = document.getElementById("deliveryOption");
-const calculateBtn = document.getElementById("calculateBtn");
-const validationMessage = document.getElementById("validationMessage");
-const orderSummary = document.getElementById("orderSummary");
+let customerNameInput;
+let productCountInput;
+let productsContainer;
+let deliveryOptionSelect;
+let calculateBtn;
+let validationMessage;
+let orderSummary;
 
 function calculateItemAmount(price, quantity) {
   return price * quantity;
@@ -12,11 +12,11 @@ function calculateItemAmount(price, quantity) {
 
 function calculateDiscount(subtotal) {
   if (subtotal >= 5000) {
-    return subtotal * 0.10;
+    return roundMoney(subtotal * 0.10);
   } else if (subtotal >= 3000) {
-    return subtotal * 0.07;
+    return roundMoney(subtotal * 0.07);
   } else if (subtotal >= 1000) {
-    return subtotal * 0.05;
+    return roundMoney(subtotal * 0.05);
   } else {
     return 0;
   }
@@ -33,6 +33,10 @@ function getDeliveryFee(option) {
     default:
       return 0;
   }
+}
+
+function roundMoney(amount) {
+  return Math.round(amount * 100) / 100;
 }
 
 function getDiscountRate(subtotal) {
@@ -68,6 +72,16 @@ function getPositiveWholeNumber(value) {
   const numberValue = Number(value);
 
   if (!Number.isInteger(numberValue) || numberValue <= 0) {
+    return null;
+  }
+
+  return numberValue;
+}
+
+function getPositiveNumber(value) {
+  const numberValue = parseFloat(value);
+
+  if (Number.isNaN(numberValue) || numberValue <= 0) {
     return null;
   }
 
@@ -114,7 +128,7 @@ function renderProductInputs() {
         </div>
         <div class="product-field">
           <label for="productQuantity-${index}">Quantity</label>
-          <input type="number" id="productQuantity-${index}" min="1" step="1" value="${escapeAttribute(savedValue.quantity)}" placeholder="Quantity">
+          <input type="number" id="productQuantity-${index}" min="0.01" step="0.01" value="${escapeAttribute(savedValue.quantity)}" placeholder="Quantity">
         </div>
       </div>
     `;
@@ -151,19 +165,19 @@ function validateOrderInputs(productCount) {
     const productName = document.getElementById(`productName-${index}`);
     const productPrice = document.getElementById(`productPrice-${index}`);
     const productQuantity = document.getElementById(`productQuantity-${index}`);
-    const price = Number(productPrice ? productPrice.value : "");
-    const quantity = Number(productQuantity ? productQuantity.value : "");
+    const price = productPrice ? getPositiveNumber(productPrice.value) : null;
+    const quantity = productQuantity ? getPositiveNumber(productQuantity.value) : null;
 
     if (!productName || productName.value.trim() === "") {
       return `Product Name is required for product ${index + 1}.`;
     }
 
-    if (!productPrice || Number.isNaN(price) || price <= 0) {
+    if (price === null) {
       return `Price must be a valid positive number for product ${index + 1}.`;
     }
 
-    if (!productQuantity || !Number.isInteger(quantity) || quantity <= 0) {
-      return `Quantity must be a valid positive whole number for product ${index + 1}.`;
+    if (quantity === null) {
+      return `Quantity must be a valid positive number for product ${index + 1}.`;
     }
   }
 
@@ -173,13 +187,15 @@ function validateOrderInputs(productCount) {
 function calculateOrder() {
   const productCount = getPositiveWholeNumber(productCountInput.value);
 
-  renderProductInputs();
+  if (productCount !== null && productsContainer.children.length !== productCount) {
+    renderProductInputs();
+  }
 
   const validationError = validateOrderInputs(productCount);
 
   if (validationError !== "") {
     setValidationMessage(validationError);
-    orderSummary.innerHTML = `<p class="empty-summary">Please correct the highlighted order details, then calculate again.</p>`;
+    orderSummary.innerHTML = `<p class="empty-summary">Please correct the order details, then calculate again.</p>`;
     return;
   }
 
@@ -190,8 +206,8 @@ function calculateOrder() {
 
   for (let index = 0; index < productCount; index++) {
     const productName = document.getElementById(`productName-${index}`).value.trim();
-    const price = Number(document.getElementById(`productPrice-${index}`).value);
-    const quantity = Number(document.getElementById(`productQuantity-${index}`).value);
+    const price = getPositiveNumber(document.getElementById(`productPrice-${index}`).value);
+    const quantity = getPositiveNumber(document.getElementById(`productQuantity-${index}`).value);
     const amount = calculateItemAmount(price, quantity);
 
     subtotal += amount;
@@ -254,7 +270,38 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
-productCountInput.addEventListener("input", renderProductInputs);
-calculateBtn.addEventListener("click", calculateOrder);
+function initializeCheckoutApp() {
+  customerNameInput = document.getElementById("customerName");
+  productCountInput = document.getElementById("productCount");
+  productsContainer = document.getElementById("productsContainer");
+  deliveryOptionSelect = document.getElementById("deliveryOption");
+  calculateBtn = document.getElementById("calculateBtn");
+  validationMessage = document.getElementById("validationMessage");
+  orderSummary = document.getElementById("orderSummary");
 
-renderProductInputs();
+  if (!customerNameInput || !productCountInput || !productsContainer || !deliveryOptionSelect || !calculateBtn || !validationMessage || !orderSummary) {
+    return;
+  }
+
+  productCountInput.addEventListener("input", renderProductInputs);
+  productCountInput.addEventListener("change", renderProductInputs);
+  calculateBtn.addEventListener("click", calculateOrder);
+
+  renderProductInputs();
+}
+
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeCheckoutApp);
+  } else {
+    initializeCheckoutApp();
+  }
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    calculateItemAmount,
+    calculateDiscount,
+    getDeliveryFee
+  };
+}
